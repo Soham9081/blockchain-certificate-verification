@@ -1,0 +1,225 @@
+# Blockchain Academic Certificate Verification System
+
+A decentralized application (DApp) for issuing and verifying academic certificates on a local Ethereum blockchain, with optional PDF tamper detection using browser-native SHA-256 hashing.
+
+Built as a final-year project to demonstrate blockchain immutability, smart contract programming, and client-side cryptography.
+
+---
+
+## Problem Statement
+
+Paper certificates and centrally stored PDFs can be forged, altered, or lost. A blockchain-based system makes certificate records immutable -- once issued, they cannot be changed without detection. Adding document hash verification extends this guarantee to the PDF file itself.
+
+## Solution
+
+- Certificate metadata is written to a Solidity smart contract on a local Hardhat blockchain.
+- The SHA-256 hash of an associated PDF is computed entirely in the browser and stored on-chain alongside the metadata.
+- Anyone can verify a certificate ID and optionally upload a PDF to check whether it matches the registered hash -- no backend, no file upload, no transaction required.
+
+---
+
+## Features
+
+- **Issue certificates** -- record student name, course name, and a unique certificate ID permanently on-chain.
+- **Verify certificates** -- query any certificate by ID; results are read directly from the blockchain.
+- **PDF document hashing** -- SHA-256 hash of a PDF is computed in the browser using the native `crypto.subtle.digest` API. The file never leaves the device.
+- **On-chain hash storage** -- the 32-byte document hash is stored in the smart contract alongside the certificate record (`bytes32 documentHash`). If no PDF is attached, a zero hash is stored.
+- **Tamper detection** -- upload any PDF during verification to compare its hash against the on-chain record. Three clear results are shown:
+  - **DOCUMENT MATCH** -- the uploaded PDF is identical to the registered file.
+  - **DOCUMENT MISMATCH** -- the uploaded PDF has been altered since registration.
+  - **CERTIFICATE NOT FOUND** -- no certificate with that ID exists on-chain.
+- **Duplicate ID protection** -- the contract rejects any attempt to issue a certificate with an already-used ID.
+- **Read-only verification** -- no MetaMask prompt, no gas cost, no wallet required to verify.
+- **Dark UI** -- glassmorphism-styled React interface with animated status indicators.
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, JavaScript (ES2022) |
+| Styling | Vanilla CSS |
+| Smart contract | Solidity 0.8.20 |
+| Local blockchain | Hardhat |
+| Web3 library | ethers.js v6 |
+| Wallet | MetaMask |
+| Hashing | `crypto.subtle.digest` (browser built-in) |
+
+---
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) v18 or later
+- [MetaMask](https://metamask.io/) browser extension
+- npm (included with Node.js)
+
+---
+
+## Installation
+
+```bash
+git clone <your-repo-url>
+cd blck
+npm install
+```
+
+---
+
+## Running the Project
+
+### 1. Start the Hardhat local blockchain node
+
+Open a terminal and keep it running:
+
+```bash
+npx hardhat node
+```
+
+This starts a local Ethereum node at `http://127.0.0.1:8545` with Chain ID `31337` and prints 20 funded test accounts.
+
+### 2. Deploy the smart contract
+
+In a second terminal:
+
+```bash
+npx hardhat run scripts/deploy.cjs --network localhost
+```
+
+This compiles the contract, deploys it, and automatically writes the contract address and ABI to `src/contractData.json`. You must redeploy every time the Hardhat node is restarted.
+
+### 3. Start the frontend
+
+```bash
+npm run dev
+```
+
+Open the URL shown in the terminal (typically `http://localhost:5173`).
+
+---
+
+## MetaMask Configuration
+
+Add Hardhat Local as a custom network in MetaMask:
+
+| Setting | Value |
+|---|---|
+| Network name | Hardhat Local |
+| RPC URL | `http://127.0.0.1:8545` |
+| Chain ID | `31337` |
+| Currency symbol | `ETH` |
+
+Import a test account by copying one of the private keys printed by `npx hardhat node` into MetaMask > Import Account. These keys are for local testing only -- never use them on a real network.
+
+---
+
+## Smart Contract Tests
+
+```bash
+npx hardhat test
+```
+
+Expected output (7 tests):
+
+```
+CertificateVerification
+  1. Contract deploys
+  2. Certificate can be issued (no PDF)
+  3. Certificate can be issued with document hash
+  4. Certificate can be verified
+  5. Document hash is stored correctly
+  6. Duplicate certificate IDs are rejected
+  7. Certificate count increases
+
+7 passing
+```
+
+## Production Build
+
+```bash
+npx vite build
+```
+
+Output is written to the `dist/` directory.
+
+---
+
+## Project Structure
+
+```
+blck/
+  contracts/
+    CertificateVerification.sol   - Smart contract
+  scripts/
+    deploy.cjs                    - Deployment script
+  src/
+    App.jsx                       - React frontend
+    contract.js                   - Exports address, ABI, chain ID
+    contractData.json             - Auto-generated by deploy script
+    index.css                     - Styles
+    main.jsx                      - React entry point
+  test/
+    CertificateVerification.cjs   - Hardhat/Chai tests
+  hardhat.config.cjs
+  package.json
+  vite.config.js
+```
+
+---
+
+## Demonstration Workflow
+
+### Issue a certificate with a PDF
+
+1. Connect MetaMask (Hardhat Local network, a funded test account).
+2. Fill in: Student Name, Certificate ID (e.g. `CERT-001`), Course Name.
+3. Optionally select a PDF. The SHA-256 hash is shown immediately below the file picker.
+4. Click **Issue Certificate** and confirm the MetaMask transaction.
+
+### Verify -- original PDF (DOCUMENT MATCH)
+
+1. Enter `CERT-001` in the Verify panel.
+2. Upload the same PDF that was used during issuance.
+3. Click **Verify Certificate**.
+4. Result: **DOCUMENT MATCH** -- the hashes are equal.
+
+### Verify -- different PDF (DOCUMENT MISMATCH)
+
+1. Enter `CERT-001` and upload any other PDF.
+2. Click **Verify Certificate**.
+3. Result: **DOCUMENT MISMATCH** -- the uploaded file does not match the registered hash.
+
+### Verify -- nonexistent ID (CERTIFICATE NOT FOUND)
+
+1. Enter an ID that was never issued (e.g. `CERT-999`).
+2. Click **Verify Certificate**.
+3. Result: **CERTIFICATE NOT FOUND**.
+
+---
+
+## Security Notes
+
+- **Local prototype only.** This project runs on a Hardhat local network and is not audited for production use.
+- **Hardhat private keys are not secret.** The funded test accounts and their private keys are publicly known. Never send real funds to them.
+- **Document hash matching.** A DOCUMENT MATCH result means the uploaded PDF produces the same SHA-256 hash as the file that was registered. It does not prove the content is valid or that the issuer is a legitimate institution -- it only proves the file has not changed since registration.
+- **No issuer authorization.** Any connected wallet can call `issueCertificate`. A production system would restrict this to authorized issuers through an access control mechanism (e.g. OpenZeppelin `Ownable` or a role-based system).
+- **PDF is never uploaded.** Hashing is done entirely in the browser using `crypto.subtle.digest`. The file bytes never leave the device.
+
+---
+
+## Limitations and Possible Future Improvements
+
+| Limitation | Possible improvement |
+|---|---|
+| Anyone can issue certificates | Add role-based access control (e.g. `onlyOwner` or an institution registry) |
+| Hardhat Local only | Deploy to a public testnet (Sepolia) or mainnet |
+| No certificate revocation | Add a `revokeCertificate` function |
+| No pagination for issued certs | Emit and index events; use a subgraph (The Graph) |
+| MetaMask required for issuance | Support WalletConnect for broader wallet compatibility |
+| Single contract instance | Multi-institution support with factory pattern |
+
+---
+
+## License
+
+MIT
